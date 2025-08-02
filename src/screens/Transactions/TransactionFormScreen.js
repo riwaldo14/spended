@@ -25,6 +25,7 @@ export default function TransactionFormScreen({ navigation, route }) {
   const [amount, setAmount] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState(null);
   const [account, setAccount] = useState("");
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [date, setDate] = useState(new Date());
@@ -33,6 +34,18 @@ export default function TransactionFormScreen({ navigation, route }) {
   const [isLoading, setIsLoading] = useState(false);
 
   const { addTransaction, updateTransaction } = useTransaction();
+
+  console.log("selectedCategory:", selectedCategory);
+  console.log("initialTrx:", JSON.stringify(initialTransaction, null, 2));
+  //   console.log("selectedAccount:", selectedAccount);
+
+  // Reset category when transaction type changes
+  useEffect(() => {
+    if (selectedCategory && selectedCategory.type !== type) {
+      setSelectedCategory(null);
+      setCategory("");
+    }
+  }, [type, selectedCategory]);
 
   // Initialize form with existing data if editing
   useEffect(() => {
@@ -44,6 +57,10 @@ export default function TransactionFormScreen({ navigation, route }) {
       setAccount(initialTransaction.account);
       // For editing, we just store the account name since we don't have account object
       setSelectedAccount({ name: initialTransaction.account });
+      //   setSelectedCategory({
+      //     name: initialTransaction.category,
+      //     icon: initialTransaction.categoryIcon,
+      //   });
       setExcludeFromCalculations(
         initialTransaction.excludeFromCalculations || false
       );
@@ -109,6 +126,16 @@ export default function TransactionFormScreen({ navigation, route }) {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleChooseCategory = () => {
+    navigation.navigate("ChooseCategory", {
+      transactionType: type,
+      onSelectCategory: (selectedCat) => {
+        setSelectedCategory(selectedCat);
+        setCategory(selectedCat.name);
+      },
+    });
   };
 
   const handleChooseAccount = () => {
@@ -233,14 +260,54 @@ export default function TransactionFormScreen({ navigation, route }) {
           {/* Category */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Category *</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g., Food, Transportation, Salary"
-              value={category}
-              onChangeText={setCategory}
-              maxLength={50}
-              returnKeyType="next"
-            />
+            <TouchableOpacity
+              style={styles.categoryButton}
+              onPress={handleChooseCategory}
+              activeOpacity={0.7}
+            >
+              <View style={styles.categoryButtonLeft}>
+                {selectedCategory ? (
+                  <>
+                    <View
+                      style={[
+                        styles.categoryIconSmall,
+                        {
+                          backgroundColor: `${
+                            selectedCategory.color || "#3498db"
+                          }20`,
+                        },
+                      ]}
+                    >
+                      <Ionicons
+                        name={selectedCategory.icon || "pricetag-outline"}
+                        size={16}
+                        color={selectedCategory.color || "#3498db"}
+                      />
+                    </View>
+                    <Text
+                      style={[
+                        styles.categoryButtonText,
+                        styles.categoryButtonTextSelected,
+                      ]}
+                    >
+                      {selectedCategory.name}
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Ionicons
+                      name="pricetag-outline"
+                      size={20}
+                      color="#7f8c8d"
+                    />
+                    <Text style={styles.categoryButtonText}>
+                      Choose Category
+                    </Text>
+                  </>
+                )}
+              </View>
+              <Ionicons name="chevron-forward" size={20} color="#7f8c8d" />
+            </TouchableOpacity>
           </View>
 
           {/* Account */}
@@ -470,6 +537,37 @@ const styles = StyleSheet.create({
   accountButtonTextSelected: {
     color: "#2c3e50",
     fontWeight: "500",
+  },
+  categoryButton: {
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#e1e8ed",
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  categoryButtonLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  categoryButtonText: {
+    fontSize: 16,
+    color: "#95a5a6",
+    marginLeft: 12,
+  },
+  categoryButtonTextSelected: {
+    color: "#2c3e50",
+    fontWeight: "500",
+  },
+  categoryIconSmall: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
   },
   dateButton: {
     backgroundColor: "#ffffff",

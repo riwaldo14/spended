@@ -24,6 +24,11 @@ export const WorkspaceProvider = ({ children }) => {
   useEffect(() => {
     if (user) {
       loadWorkspaces();
+    } else {
+      // Reset state when user logs out
+      setWorkspaces([]);
+      setCurrentWorkspace(null);
+      setIsLoading(false);
     }
   }, [user]);
 
@@ -58,6 +63,9 @@ export const WorkspaceProvider = ({ children }) => {
             "currentWorkspaceId",
             workspacesList[0].id
           );
+        } else {
+          // No workspaces exist - set currentWorkspace to null
+          setCurrentWorkspace(null);
         }
 
         setIsLoading(false);

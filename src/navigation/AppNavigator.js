@@ -13,26 +13,34 @@ export default function AppNavigator() {
   const { user, isLoading, hasCompletedOnboarding } = useAuth();
   const { currentWorkspace, isLoading: workspaceLoading } = useWorkspace();
 
+  // Debug logging
+  //   console.log("AppNavigator Debug:", {
+  //     user: !!user,
+  //     hasCompletedOnboarding,
+  //     currentWorkspace: !!currentWorkspace,
+  //     isLoading,
+  //     workspaceLoading,
+  //   });
+
   if (isLoading) {
     return <LoadingScreen />;
   }
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      {user && hasCompletedOnboarding ? (
-        // User completed onboarding, check workspace status
+      {!user || !hasCompletedOnboarding ? (
+        // User not authenticated or not completed onboarding
+        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+      ) : !currentWorkspace ? (
+        // User completed onboarding but no workspace, show workspace setup
         workspaceLoading ? (
           <Stack.Screen name="Loading" component={LoadingScreen} />
-        ) : currentWorkspace ? (
-          // User has workspace, show main app with tabs
-          <Stack.Screen name="Main" component={MainStackNavigator} />
         ) : (
-          // User completed onboarding but no workspace, show workspace setup
           <Stack.Screen name="Workspace" component={WorkspaceScreen} />
         )
       ) : (
-        // User not authenticated or not completed onboarding
-        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+        // User has workspace, show main app with tabs
+        <Stack.Screen name="Main" component={MainStackNavigator} />
       )}
     </Stack.Navigator>
   );

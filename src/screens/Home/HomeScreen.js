@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useMemo } from "react";
 import {
   View,
   Text,
@@ -7,110 +7,192 @@ import {
   StyleSheet,
   SafeAreaView,
   RefreshControl,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../../context/AuthContext";
 import { useWorkspace } from "../../context/WorkspaceContext";
 import { useTransaction } from "../../context/TransactionContext";
+import { useCategory } from "../../context/CategoryContext";
+import MonthlyFilter from "../../components/MonthlyFilter/MonthlyFilter";
 
 export default function HomeScreen({ navigation }) {
   const { user } = useAuth();
   const { currentWorkspace } = useWorkspace();
-  const { transactions, isLoading, getTotalByType } = useTransaction();
+  const { transactions, isLoading } = useTransaction();
+  const { categories } = useCategory();
 
-  const income = getTotalByType("income");
-  const expense = getTotalByType("expense");
-  const balance = income - expense;
+  // State for monthly filter
+  const [currentDate, setCurrentDate] = useState(new Date());
+
+  // Get current month/year for filtering
+  const currentMonth = currentDate.getMonth();
+  const currentYear = currentDate.getFullYear();
+
+  // Filter transactions by current month/year and exclude from calculations
+  const filteredTransactions = useMemo(() => {
+    return transactions.filter((transaction) => {
+      if (transaction.excludeFromCalculations) return false;
+
+      const transactionDate = transaction.date.toDate
+        ? transaction.date.toDate()
+        : new Date(transaction.date);
+      return (
+        transactionDate.getMonth() === currentMonth &&
+        transactionDate.getFullYear() === currentYear
+      );
+    });
+  }, [transactions, currentMonth, currentYear]);
+
+  // Calculate totals
+  const income = filteredTransactions
+    .filter((t) => t.type === "income")
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const expense = filteredTransactions
+    .filter((t) => t.type === "expense")
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const saving = income - expense;
+
+  // Group transactions by category and calculate totals
+  const expenseCategories = useMemo(() => {
+    const categoryTotals = {};
+
+    filteredTransactions
+      .filter((t) => t.type === "expense")
+      .forEach((transaction) => {
+        if (categoryTotals[transaction.category]) {
+          categoryTotals[transaction.category] += transaction.amount;
+        } else {
+          categoryTotals[transaction.category] = transaction.amount;
+        }
+      });
+
+    return Object.entries(categoryTotals)
+      .map(([categoryName, amount]) => {
+        // Find the category data to get icon and color
+        const categoryData = categories.find(
+          (cat) => cat.name === categoryName && cat.type === "expense"
+        );
+        return {
+          category: categoryName,
+          amount,
+          icon: categoryData?.icon || "pricetag-outline",
+          color: categoryData?.color || "#e74c3c",
+        };
+      })
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 6); // Get top 6 (5 + "see more")
+  }, [filteredTransactions, categories]);
+
+  const incomeCategories = useMemo(() => {
+    const categoryTotals = {};
+
+    filteredTransactions
+      .filter((t) => t.type === "income")
+      .forEach((transaction) => {
+        if (categoryTotals[transaction.category]) {
+          categoryTotals[transaction.category] += transaction.amount;
+        } else {
+          categoryTotals[transaction.category] = transaction.amount;
+        }
+      });
+
+    return Object.entries(categoryTotals)
+      .map(([categoryName, amount]) => {
+        // Find the category data to get icon and color
+        const categoryData = categories.find(
+          (cat) => cat.name === categoryName && cat.type === "income"
+        );
+        return {
+          category: categoryName,
+          amount,
+          icon: categoryData?.icon || "pricetag-outline",
+          color: categoryData?.color || "#27ae60",
+        };
+      })
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 6); // Get top 6 (5 + "see more")
+  }, [filteredTransactions, categories]);
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat("id-ID", {
       style: "currency",
-      currency: "USD",
+      currency: "IDR",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
     }).format(amount);
   };
 
-  const formatDate = (timestamp) => {
-    if (!timestamp) return "";
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  const formatMonthYear = (date) => {
     return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
+      month: "long",
+      year: "numeric",
     });
   };
 
-  const renderTransactionItem = ({ item }) => (
-    <TouchableOpacity
-      style={[
-        styles.transactionItem,
-        item.excludeFromCalculations && styles.transactionItemExcluded,
-      ]}
-      onPress={() =>
-        navigation.navigate("TransactionDetail", { transactionId: item.id })
-      }
-    >
-      <View style={styles.transactionLeft}>
+  const handleDateChange = (newDate) => {
+    setCurrentDate(newDate);
+  };
+
+  const handleWorkspacePress = () => {
+    // Navigate to workspace list (empty for now)
+    console.log("Navigate to workspace list");
+  };
+
+  const renderCategoryItem = (item, index, type, isLast = false) => {
+    if (
+      isLast &&
+      (type === "expense"
+        ? expenseCategories.length > 5
+        : incomeCategories.length > 5)
+    ) {
+      return (
+        <View
+          key="see-more"
+          style={[styles.categoryItem, { backgroundColor: "#f5f5f5" }]}
+        >
+          <View
+            style={[
+              styles.categoryIconContainer,
+              { backgroundColor: "#e1e8ed" },
+            ]}
+          >
+            <Ionicons name="ellipsis-horizontal" size={16} color="#7f8c8d" />
+          </View>
+          <View style={styles.categoryInfo}>
+            <Text style={styles.categoryName}>See More</Text>
+            <Text style={styles.categoryAmount}>...</Text>
+          </View>
+        </View>
+      );
+    }
+
+    if (!item) return null;
+
+    return (
+      <View
+        key={item.category}
+        style={[styles.categoryItem, { backgroundColor: `${item.color}20` }]}
+      >
         <View
           style={[
-            styles.categoryIcon,
-            {
-              backgroundColor: item.excludeFromCalculations
-                ? "#f8f9fa"
-                : item.type === "income"
-                ? "#e8f5e8"
-                : "#ffeaea",
-            },
+            styles.categoryIconContainer,
+            { backgroundColor: `${item.color}30` },
           ]}
         >
-          {item.excludeFromCalculations ? (
-            <Ionicons name="calculator-outline" size={16} color="#95a5a6" />
-          ) : (
-            <Ionicons
-              name={item.type === "income" ? "arrow-down" : "arrow-up"}
-              size={16}
-              color={item.type === "income" ? "#27ae60" : "#e74c3c"}
-            />
-          )}
+          <Ionicons name={item.icon} size={16} color={item.color} />
         </View>
-        <View style={styles.transactionInfo}>
-          <View style={styles.transactionTitleRow}>
-            <Text
-              style={[
-                styles.transactionDescription,
-                item.excludeFromCalculations &&
-                  styles.transactionDescriptionExcluded,
-              ]}
-            >
-              {item.description}
-            </Text>
-            {item.excludeFromCalculations && (
-              <Text style={styles.excludedBadge}>EXCLUDED</Text>
-            )}
-          </View>
-          <Text style={styles.transactionDetails}>
-            {item.category} • {item.account}
+        <View style={styles.categoryInfo}>
+          <Text style={styles.categoryName}>{item.category}</Text>
+          <Text style={[styles.categoryAmount, { color: item.color }]}>
+            {formatCurrency(item.amount)}
           </Text>
         </View>
       </View>
-      <View style={styles.transactionRight}>
-        <Text
-          style={[
-            styles.transactionAmount,
-            {
-              color: item.excludeFromCalculations
-                ? "#95a5a6"
-                : item.type === "income"
-                ? "#27ae60"
-                : "#e74c3c",
-            },
-          ]}
-        >
-          {item.type === "income" ? "+" : "-"}
-          {formatCurrency(item.amount)}
-        </Text>
-        <Text style={styles.transactionDate}>{formatDate(item.date)}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+    );
+  };
 
   const onRefresh = React.useCallback(() => {
     // Refresh will be handled automatically by the real-time listener
@@ -118,67 +200,97 @@ export default function HomeScreen({ navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Hello! 👋</Text>
-          <Text style={styles.workspaceName}>{currentWorkspace?.name}</Text>
-        </View>
-      </View>
-
-      <View style={styles.balanceCard}>
-        <Text style={styles.balanceLabel}>Total Balance</Text>
-        <Text
-          style={[
-            styles.balanceAmount,
-            { color: balance >= 0 ? "#27ae60" : "#e74c3c" },
-          ]}
-        >
-          {formatCurrency(balance)}
-        </Text>
-
-        <View style={styles.balanceDetails}>
-          <View style={styles.balanceItem}>
-            <Text style={styles.balanceItemLabel}>Income</Text>
-            <Text style={[styles.balanceItemAmount, { color: "#27ae60" }]}>
-              {formatCurrency(income)}
-            </Text>
-          </View>
-          <View style={styles.balanceItem}>
-            <Text style={styles.balanceItemLabel}>Expenses</Text>
-            <Text style={[styles.balanceItemAmount, { color: "#e74c3c" }]}>
-              {formatCurrency(expense)}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.transactionsHeader}>
-        <Text style={styles.transactionsTitle}>Recent Transactions</Text>
-        <Text style={styles.transactionsCount}>
-          {transactions.length} transactions
-        </Text>
-      </View>
-
-      <FlatList
-        data={transactions}
-        renderItem={renderTransactionItem}
-        keyExtractor={(item) => item.id}
-        style={styles.transactionsList}
-        showsVerticalScrollIndicator={false}
+      <ScrollView
+        style={styles.scrollView}
         refreshControl={
           <RefreshControl refreshing={isLoading} onRefresh={onRefresh} />
         }
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="receipt-outline" size={48} color="#bdc3c7" />
-            <Text style={styles.emptyStateText}>No transactions yet</Text>
-            <Text style={styles.emptyStateSubtext}>
-              Add your first transaction to get started
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header with Workspace and Date Filter */}
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.workspaceButton}
+            onPress={handleWorkspacePress}
+          >
+            <Text style={styles.workspaceText}>
+              {currentWorkspace?.name || "Workspace"}
+            </Text>
+            <Ionicons name="chevron-down" size={16} color="#7f8c8d" />
+          </TouchableOpacity>
+
+          <MonthlyFilter
+            currentDate={currentDate}
+            onDateChange={handleDateChange}
+          />
+        </View>
+
+        {/* Saving Container */}
+        <View style={styles.summaryContainer}>
+          <View style={styles.summaryItem}>
+            <Text style={styles.summaryLabel}>Saving</Text>
+            <Text
+              style={[
+                styles.summaryAmount,
+                { color: saving >= 0 ? "#27ae60" : "#e74c3c" },
+              ]}
+            >
+              {formatCurrency(saving)}
             </Text>
           </View>
-        }
-      />
+        </View>
 
+        {/* Expense Container */}
+        <View style={styles.categoryContainer}>
+          <View style={styles.categoryHeader}>
+            <Text style={styles.categoryTitle}>Expense</Text>
+            <Text style={[styles.categoryTotal, { color: "#e74c3c" }]}>
+              {formatCurrency(expense)}
+            </Text>
+          </View>
+
+          <View style={styles.categoryGrid}>
+            {expenseCategories
+              .slice(0, 5)
+              .map((item, index) => renderCategoryItem(item, index, "expense"))}
+            {expenseCategories.length > 5 &&
+              renderCategoryItem(null, 5, "expense", true)}
+            {expenseCategories.length === 0 && (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>No expenses this month</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Income Container */}
+        <View style={styles.categoryContainer}>
+          <View style={styles.categoryHeader}>
+            <Text style={styles.categoryTitle}>Income</Text>
+            <Text style={[styles.categoryTotal, { color: "#27ae60" }]}>
+              {formatCurrency(income)}
+            </Text>
+          </View>
+
+          <View style={styles.categoryGrid}>
+            {incomeCategories
+              .slice(0, 5)
+              .map((item, index) => renderCategoryItem(item, index, "income"))}
+            {incomeCategories.length > 5 &&
+              renderCategoryItem(null, 5, "income", true)}
+            {incomeCategories.length === 0 && (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>No income this month</Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {/* Add some bottom padding for the FAB */}
+        <View style={styles.bottomPadding} />
+      </ScrollView>
+
+      {/* Floating Action Button */}
       <TouchableOpacity
         style={styles.fab}
         onPress={() => navigation.navigate("TransactionForm")}
@@ -194,28 +306,35 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f8f9fa",
   },
+  scrollView: {
+    flex: 1,
+  },
   header: {
     flexDirection: "row",
-    justifyContent: "flex-start",
+    justifyContent: "space-between",
     alignItems: "center",
     padding: 20,
     paddingTop: 10,
   },
-  greeting: {
-    fontSize: 16,
-    color: "#7f8c8d",
+  workspaceButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ffa726",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 8,
   },
-  workspaceName: {
-    fontSize: 20,
-    fontWeight: "bold",
+  workspaceText: {
+    fontSize: 14,
+    fontWeight: "500",
     color: "#2c3e50",
-    marginTop: 2,
   },
-  balanceCard: {
+  summaryContainer: {
     backgroundColor: "#ffffff",
     margin: 20,
     marginTop: 10,
-    padding: 24,
+    padding: 20,
     borderRadius: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -223,143 +342,92 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  balanceLabel: {
-    fontSize: 14,
+  summaryItem: {
+    alignItems: "center",
+  },
+  summaryLabel: {
+    fontSize: 16,
     color: "#7f8c8d",
     marginBottom: 8,
   },
-  balanceAmount: {
-    fontSize: 32,
+  summaryAmount: {
+    fontSize: 24,
     fontWeight: "bold",
-    marginBottom: 20,
   },
-  balanceDetails: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  categoryContainer: {
+    backgroundColor: "#ffffff",
+    margin: 20,
+    marginTop: 10,
+    padding: 20,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  balanceItem: {
-    alignItems: "center",
-  },
-  balanceItemLabel: {
-    fontSize: 12,
-    color: "#7f8c8d",
-    marginBottom: 4,
-  },
-  balanceItemAmount: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  transactionsHeader: {
+  categoryHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
     marginBottom: 16,
   },
-  transactionsTitle: {
+  categoryTitle: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#2c3e50",
   },
-  transactionsCount: {
-    fontSize: 14,
-    color: "#7f8c8d",
+  categoryTotal: {
+    fontSize: 16,
+    fontWeight: "600",
   },
-  transactionsList: {
-    flex: 1,
-    paddingHorizontal: 20,
-  },
-  transactionItem: {
-    backgroundColor: "#ffffff",
-    padding: 16,
-    marginBottom: 8,
-    borderRadius: 12,
+  categoryGrid: {
     flexDirection: "row",
+    flexWrap: "wrap",
     justifyContent: "space-between",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    gap: 8,
   },
-  transactionLeft: {
+  categoryItem: {
+    width: "48%",
     flexDirection: "row",
     alignItems: "center",
-    flex: 1,
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
   },
-  categoryIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  categoryIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
   },
-  transactionInfo: {
+  categoryInfo: {
     flex: 1,
   },
-  transactionTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 2,
-  },
-  transactionDescription: {
-    fontSize: 16,
+  categoryName: {
+    fontSize: 14,
     fontWeight: "500",
     color: "#2c3e50",
-    flex: 1,
-  },
-  transactionDescriptionExcluded: {
-    color: "#95a5a6",
-  },
-  excludedBadge: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: "#95a5a6",
-    backgroundColor: "#ecf0f1",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginLeft: 8,
-  },
-  transactionDetails: {
-    fontSize: 12,
-    color: "#7f8c8d",
-  },
-  transactionRight: {
-    alignItems: "flex-end",
-  },
-  transactionAmount: {
-    fontSize: 16,
-    fontWeight: "600",
     marginBottom: 2,
   },
-  transactionDate: {
+  categoryAmount: {
     fontSize: 12,
-    color: "#7f8c8d",
-  },
-  transactionItemExcluded: {
-    opacity: 0.7,
-    borderLeftWidth: 3,
-    borderLeftColor: "#95a5a6",
+    fontWeight: "600",
   },
   emptyState: {
+    width: "100%",
     alignItems: "center",
-    justifyContent: "center",
-    padding: 40,
+    padding: 20,
   },
-  emptyStateText: {
-    fontSize: 18,
-    fontWeight: "500",
-    color: "#7f8c8d",
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyStateSubtext: {
+  emptyText: {
     fontSize: 14,
-    color: "#bdc3c7",
-    textAlign: "center",
+    color: "#7f8c8d",
+    fontStyle: "italic",
+  },
+  bottomPadding: {
+    height: 100,
   },
   fab: {
     position: "absolute",

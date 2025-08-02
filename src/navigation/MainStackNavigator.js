@@ -5,6 +5,8 @@ import TransactionFormScreen from "../screens/Transactions/TransactionFormScreen
 import TransactionDetailScreen from "../screens/Transactions/TransactionDetailScreen";
 import ChooseAccountScreen from "../screens/Accounts/ChooseAccountScreen";
 import AccountFormScreen from "../screens/Accounts/AccountFormScreen";
+import ChooseCategoryScreen from "../screens/Categories/ChooseCategoryScreen";
+import CategoryFormScreen from "../screens/Categories/CategoryFormScreen";
 
 const Stack = createStackNavigator();
 
@@ -30,6 +32,11 @@ export default function MainStackNavigator() {
       <Stack.Screen name="ChooseAccount" component={ChooseAccountScreen} />
 
       <Stack.Screen name="AccountForm" component={AccountFormScreen} />
+
+      {/* Category screens */}
+      <Stack.Screen name="ChooseCategory" component={ChooseCategoryScreen} />
+
+      <Stack.Screen name="CategoryForm" component={CategoryFormScreen} />
     </Stack.Navigator>
   );
 }

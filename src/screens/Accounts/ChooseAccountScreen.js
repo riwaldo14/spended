@@ -12,8 +12,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAccount } from "../../context/AccountContext";
 
 export default function ChooseAccountScreen({ navigation, route }) {
-  const { accounts, isLoading } = useAccount();
+  const { accounts, isLoading, ensureDefaultAccounts } = useAccount();
   const { onSelectAccount } = route.params || {};
+
+  // Create default accounts if none exist - add safety check for undefined
+  React.useEffect(() => {
+    if (!isLoading && (!accounts || accounts.length === 0)) {
+      ensureDefaultAccounts();
+    }
+  }, [isLoading, accounts, ensureDefaultAccounts]);
 
   const handleSelectAccount = (account) => {
     if (onSelectAccount) {

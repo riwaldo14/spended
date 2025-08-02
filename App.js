@@ -5,6 +5,7 @@ import { WorkspaceProvider } from "./src/context/WorkspaceContext";
 import { TransactionProvider } from "./src/context/TransactionContext";
 import { AccountProvider } from "./src/context/AccountContext";
 import AppNavigator from "./src/navigation/AppNavigator";
+import { CategoryProvider } from "./src/context/CategoryContext";
 
 export default function App() {
   return (
@@ -13,7 +14,9 @@ export default function App() {
         <WorkspaceProvider>
           <AccountProvider>
             <TransactionProvider>
-              <AppNavigator />
+              <CategoryProvider>
+                <AppNavigator />
+              </CategoryProvider>
             </TransactionProvider>
           </AccountProvider>
         </WorkspaceProvider>

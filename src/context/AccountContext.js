@@ -20,7 +20,7 @@ const AccountContext = createContext({});
 export const AccountProvider = ({ children }) => {
   const { user } = useAuth();
   const { currentWorkspace } = useWorkspace();
-  const [accounts, setAccounts] = useState([]);
+  const [accounts, setAccounts] = useState([]); // Initialize as empty array
   const [isLoading, setIsLoading] = useState(false);
 
   // Predefined accounts
@@ -90,13 +90,9 @@ export const AccountProvider = ({ children }) => {
             });
           });
 
-          // If no accounts exist, create default accounts
-          if (accountsList.length === 0) {
-            await createDefaultAccounts();
-          } else {
-            setAccounts(accountsList);
-            setIsLoading(false);
-          }
+          // Don't auto-create accounts - let user create them when needed
+          setAccounts(accountsList);
+          setIsLoading(false);
         },
         (error) => {
           console.error("Account listener error:", error);
@@ -226,6 +222,17 @@ export const AccountProvider = ({ children }) => {
     }
   };
 
+  const ensureDefaultAccounts = async () => {
+    try {
+      if ((!accounts || accounts.length === 0) && user && currentWorkspace) {
+        console.log("Creating default accounts...");
+        await createDefaultAccounts();
+      }
+    } catch (error) {
+      console.error("Ensure default accounts error:", error);
+    }
+  };
+
   return (
     <AccountContext.Provider
       value={{
@@ -235,6 +242,7 @@ export const AccountProvider = ({ children }) => {
         updateAccount,
         deleteAccount,
         getAccountById,
+        ensureDefaultAccounts,
       }}
     >
       {children}
