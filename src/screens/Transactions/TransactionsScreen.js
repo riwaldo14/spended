@@ -33,11 +33,9 @@ export default function TransactionsScreen({ navigation }) {
   const currentMonth = currentDate.getMonth();
   const currentYear = currentDate.getFullYear();
 
-  // Filter transactions by current month/year and exclude from calculations
+  // Filter transactions by current month/year (include excluded transactions for display)
   const filteredTransactions = useMemo(() => {
     return transactions.filter((transaction) => {
-      if (transaction.excludeFromCalculations) return false;
-
       const transactionDate = transaction.date.toDate
         ? transaction.date.toDate()
         : new Date(transaction.date);
@@ -48,15 +46,17 @@ export default function TransactionsScreen({ navigation }) {
     });
   }, [transactions, currentMonth, currentYear]);
 
-  // Generate chart data for react-native-gifted-charts
+  // Generate chart data for react-native-gifted-charts (exclude from chart calculations)
   const chartData = useMemo(() => {
     const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
     const incomeData = [];
     const expenseData = [];
 
-    // Create daily data for the chart
+    // Create daily data for the chart - exclude transactions from calculations
     for (let day = 1; day <= daysInMonth; day++) {
       const dayTransactions = filteredTransactions.filter((t) => {
+        if (t.excludeFromCalculations) return false; // Exclude from chart calculations
+
         const transactionDate = t.date.toDate
           ? t.date.toDate()
           : new Date(t.date);
@@ -109,6 +109,10 @@ export default function TransactionsScreen({ navigation }) {
     console.log("Navigate to workspace list");
   };
 
+  const handleTransactionPress = (transaction) => {
+    navigation.navigate("TransactionDetail", { transactionId: transaction.id });
+  };
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
@@ -138,16 +142,15 @@ export default function TransactionsScreen({ navigation }) {
     };
   };
 
-  const handleTransactionPress = (transaction) => {
-    navigation.navigate("TransactionDetail", { transactionId: transaction.id });
-  };
-
   const renderTransactionItem = ({ item }) => {
     const categoryData = getCategoryData(item.category, item.type);
 
     return (
       <TouchableOpacity
-        style={styles.transactionItem}
+        style={[
+          styles.transactionItem,
+          item.excludeFromCalculations && styles.transactionItemExcluded,
+        ]}
         onPress={() => handleTransactionPress(item)}
         activeOpacity={0.7}
       >
@@ -155,25 +158,54 @@ export default function TransactionsScreen({ navigation }) {
           <View
             style={[
               styles.categoryIcon,
-              { backgroundColor: `${categoryData.color}20` },
+              {
+                backgroundColor: item.excludeFromCalculations
+                  ? "#f8f9fa"
+                  : `${categoryData.color}20`,
+              },
             ]}
           >
-            <Ionicons
-              name={categoryData.icon}
-              size={20}
-              color={categoryData.color}
-            />
+            {item.excludeFromCalculations ? (
+              <Ionicons name="calculator-outline" size={16} color="#95a5a6" />
+            ) : (
+              <Ionicons
+                name={categoryData.icon}
+                size={20}
+                color={categoryData.color}
+              />
+            )}
           </View>
           <View style={styles.transactionInfo}>
             <View style={styles.transactionHeader}>
-              <Text style={styles.transactionCategory}>{item.category}</Text>
+              <View style={styles.transactionTitleRow}>
+                <Text
+                  style={[
+                    styles.transactionCategory,
+                    item.excludeFromCalculations &&
+                      styles.transactionCategoryExcluded,
+                  ]}
+                >
+                  {item.category}
+                </Text>
+                {item.excludeFromCalculations && (
+                  <Text style={styles.excludedBadge}>EXCLUDED</Text>
+                )}
+              </View>
               <Text style={styles.transactionDate}>
                 {formatDate(item.date)}
               </Text>
             </View>
             <Text style={styles.transactionAccount}>{item.account}</Text>
             {item.description && (
-              <Text style={styles.transactionNote}>{item.description}</Text>
+              <Text
+                style={[
+                  styles.transactionNote,
+                  item.excludeFromCalculations &&
+                    styles.transactionNoteExcluded,
+                ]}
+              >
+                {item.description}
+              </Text>
             )}
           </View>
         </View>
@@ -181,7 +213,13 @@ export default function TransactionsScreen({ navigation }) {
           <Text
             style={[
               styles.transactionAmount,
-              { color: item.type === "income" ? "#27ae60" : "#e74c3c" },
+              {
+                color: item.excludeFromCalculations
+                  ? "#95a5a6"
+                  : item.type === "income"
+                  ? "#27ae60"
+                  : "#e74c3c",
+              },
             ]}
           >
             {item.type === "income" ? "+" : "-"}
@@ -251,7 +289,7 @@ export default function TransactionsScreen({ navigation }) {
               initialSpacing={15}
               endSpacing={15}
               // Styling
-              //   curved={true}
+              curved={true}
               thickness={2}
               thickness2={2}
               color1="#e74c3c" // Expense line color
@@ -580,6 +618,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginVertical: 2,
   },
+  transactionItemExcluded: {
+    opacity: 0.7,
+    borderLeftWidth: 3,
+    borderLeftColor: "#95a5a6",
+  },
   transactionLeft: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -602,10 +645,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 4,
   },
+  transactionTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
   transactionCategory: {
     fontSize: 16,
     fontWeight: "600",
     color: "#2c3e50",
+  },
+  transactionCategoryExcluded: {
+    color: "#95a5a6",
   },
   transactionDate: {
     fontSize: 12,
@@ -620,6 +671,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#95a5a6",
     fontStyle: "italic",
+  },
+  transactionNoteExcluded: {
+    color: "#bdc3c7",
+  },
+  excludedBadge: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#95a5a6",
+    backgroundColor: "#ecf0f1",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 8,
   },
   transactionRight: {
     alignItems: "flex-end",
